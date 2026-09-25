@@ -1,14 +1,53 @@
 {% extends "base.html" %}
 {% block title %}Dashboard | QA Scrematura{% endblock %}
 {% block content %}
+<style>
+.dashboard-shell{display:grid;gap:22px}
+.hero-dashboard{position:relative;overflow:hidden;border:1px solid #d9e4f2;background:linear-gradient(135deg,#f7fbff 0%,#edf5ff 55%,#e7f0fb 100%);border-radius:22px;padding:28px 30px;box-shadow:0 14px 34px rgba(31,70,120,.08)}
+.hero-dashboard:after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(49,112,190,.08);right:-60px;top:-90px}
+.hero-dashboard h1{margin:.2rem 0 .5rem;font-size:clamp(28px,4vw,42px);line-height:1.05}
+.hero-dashboard p:not(.eyebrow){max-width:760px;margin-bottom:0}
+.hero-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;z-index:1}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.kpi-card{background:#fff;border:1px solid #e0e8f2;border-radius:18px;padding:18px 20px;box-shadow:0 8px 22px rgba(27,61,104,.06)}
+.kpi-label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#6d7f95;font-weight:700}
+.kpi-value{font-size:30px;line-height:1;font-weight:800;color:#173c69;margin-top:8px}
+.kpi-sub{font-size:12px;color:#8493a6;margin-top:7px}
+.area-tabs{display:inline-flex;gap:5px;padding:5px;background:#edf3fa;border:1px solid #dce6f1;border-radius:14px}
+.area-tab{border:0;background:transparent;padding:10px 17px;border-radius:10px;font-weight:700;color:#5d7188;cursor:pointer}
+.area-tab.active{background:#fff;color:#174a85;box-shadow:0 3px 10px rgba(38,74,115,.10)}
+.area-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;margin-left:7px;padding:0 7px;border-radius:999px;background:#e4eef9;color:#275d98;font-size:11px}
+.area-panel{margin-top:8px}
+.area-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid #dfe8f2;background:#fff;border-radius:16px;padding:15px 18px;margin-bottom:16px}
+.area-total{font-size:25px;font-weight:800;color:#173c69}
+.cards{gap:14px}
+.system-card{position:relative;border:1px solid #e0e8f2!important;border-radius:18px!important;box-shadow:0 7px 18px rgba(24,59,99,.06)!important;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.system-card:hover{transform:translateY(-2px);border-color:#b8cee7!important;box-shadow:0 12px 26px rgba(24,59,99,.10)!important}
+.system-badge{font-weight:800;color:#194b83}
+.jira-key{background:#f0f5fb;padding:4px 8px;border-radius:8px}
+.card-footer{border-top:1px solid #eef3f8;margin-top:14px;padding-top:12px}
+.icta{background:#eaf4ff;color:#145da0;padding:5px 9px;border-radius:999px;font-weight:700}
+.unified-query{border:1px solid #cfddeb;background:linear-gradient(180deg,#fff,#f8fbff);border-radius:18px;padding:20px}
+.query-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px}
+.query-chip{font-size:11px;font-weight:700;color:#46647f;background:#edf4fb;border-radius:999px;padding:5px 9px}
+.unified-query pre{margin-top:15px;border-radius:12px;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto}
+.section-head-actions{gap:12px}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.kpi-grid{grid-template-columns:1fr}.hero-dashboard{padding:22px}.area-summary{align-items:flex-start;flex-direction:column}.area-tabs{display:flex;width:100%}.area-tab{flex:1;padding:10px 8px}}
+</style>
+
+<div class="dashboard-shell">
 <section class="hero hero-dashboard">
   <div>
     <p class="eyebrow">QA CONTROL CENTER</p>
     <h1>Scrematura mensile dei test case</h1>
-    <p>Un unico export Jira, riconoscimento automatico dei sistemi, confronto con lo storico e copertura automatica sempre visibile.</p>
+    <p>Consolidato unico Welfare + Payments, confronto con lo storico e copertura automatica sempre visibile.</p>
   </div>
-  <a class="btn primary" href="{{ url_for('upload', period=target) }}">Importa CSV mensile</a>
+  <div class="hero-actions">
+    <a class="btn primary" href="{{ url_for('upload', period=target) }}">Importa CSV mensile</a>
+  </div>
 </section>
+
 {% if alert %}
 <div class="alert">
   <div>
@@ -18,75 +57,81 @@
   <a class="btn warning" href="{{ url_for('upload', period=alert.period) }}">Vai all’import</a>
 </div>
 {% endif %}
+
+{% set welfare_total = welfare_cards|sum(attribute='consolidated') %}
+{% set payments_total = payments_cards|sum(attribute='consolidated') %}
+{% set grand_total = welfare_total + payments_total %}
+
+<section class="kpi-grid">
+  <div class="kpi-card"><div class="kpi-label">Consolidato totale</div><div class="kpi-value">{{ "{:,}".format(grand_total).replace(",", ".") }}</div><div class="kpi-sub">CDT netti Welfare + Payments</div></div>
+  <div class="kpi-card"><div class="kpi-label">Area Welfare</div><div class="kpi-value">{{ "{:,}".format(welfare_total).replace(",", ".") }}</div><div class="kpi-sub">{{ welfare_cards|length }} sistemi censiti</div></div>
+  <div class="kpi-card"><div class="kpi-label">Area Payments</div><div class="kpi-value">{{ "{:,}".format(payments_total).replace(",", ".") }}</div><div class="kpi-sub">{{ payments_cards|length }} sistemi censiti</div></div>
+  <div class="kpi-card"><div class="kpi-label">Sistemi monitorati</div><div class="kpi-value">{{ (welfare_cards|length) + (payments_cards|length) }}</div><div class="kpi-sub">un’unica vista QA</div></div>
+</section>
+
+<section class="unified-query">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">JIRA / XRAY</p>
+      <h2>Query unica Welfare + Payments</h2>
+      <div class="query-meta">
+        <span class="query-chip">Periodo precedente</span>
+        <span class="query-chip">Tutti i sistemi</span>
+        <span class="query-chip">Un solo export Jira</span>
+      </div>
+    </div>
+    <button class="btn secondary" onclick="copyText('jira-query-all', this)">Copia query</button>
+  </div>
+  <pre id="jira-query-all">({{ query_welfare }}) OR ({{ query_payments }})</pre>
+</section>
+
 <div class="area-tabs">
-  <button class="area-tab active" data-area="welfare" onclick="switchArea('welfare')">Area Welfare</button>
-  <button class="area-tab" data-area="payments" onclick="switchArea('payments')">Area Payments</button>
+  <button class="area-tab active" data-area="welfare" onclick="switchArea('welfare')">Welfare <span class="area-count">{{ welfare_cards|length }}</span></button>
+  <button class="area-tab" data-area="payments" onclick="switchArea('payments')">Payments <span class="area-count">{{ payments_cards|length }}</span></button>
 </div>
+
 <section id="area-welfare" class="area-panel active">
   <div class="section-head section-head-actions">
     <div><p class="eyebrow">AREA WELFARE</p><h2>Sistemi censiti</h2></div>
     <a class="btn secondary report-area-btn" href="{{ url_for('area_report', area='welfare') }}">Scarica report Excel Area</a>
   </div>
+  <div class="area-summary">
+    <div><strong>Baseline Welfare</strong><div class="muted">CDT netti consolidati disponibili per il confronto storico</div></div>
+    <div class="area-total">{{ "{:,}".format(welfare_total).replace(",", ".") }}</div>
+  </div>
   <div class="cards">
     {% for c in welfare_cards %}
     <a class="system-card" href="{{ url_for('system_page', system_key=c.key) }}">
-      <div class="card-top">
-        <span class="system-badge">{{ c.label }}</span>
-        <span class="jira-key">{{ c.jira }}</span>
-      </div>
+      <div class="card-top"><span class="system-badge">{{ c.label }}</span><span class="jira-key">{{ c.jira }}</span></div>
       <div class="big-number">{{ "{:,}".format(c.consolidated).replace(",", ".") }}</div>
       <div class="muted">CDT netti consolidati</div>
-      <div class="card-footer">
-        <span class="muted">{{ c.last.period if c.last else "Baseline" }}</span>
-        <span class="icta">ICTA {{ "%.1f"|format(c.icta) }}%</span>
-      </div>
+      <div class="card-footer"><span class="muted">{{ c.last.period if c.last else "Baseline" }}</span><span class="icta">ICTA {{ "%.1f"|format(c.icta) }}%</span></div>
     </a>
     {% endfor %}
   </div>
-  <section class="panel query-panel">
-    <div class="panel-head">
-      <div><p class="eyebrow">JIRA / XRAY</p><h2>Query Welfare del mese precedente</h2></div>
-      <button class="btn secondary" onclick="copyText('jira-query-welfare', this)">Copia query</button>
-    </div>
-    <pre id="jira-query-welfare">{{ query_welfare }}</pre>
-  </section>
 </section>
+
 <section id="area-payments" class="area-panel">
   <div class="section-head section-head-actions">
     <div><p class="eyebrow">AREA PAYMENTS</p><h2>Sistemi censiti</h2></div>
     <a class="btn secondary report-area-btn" href="{{ url_for('area_report', area='payments') }}">Scarica report Excel Area</a>
   </div>
-  <div class="panel" style="margin-bottom:16px">
-    <div class="card-top">
-      <strong>Totale Payments</strong>
-      <span class="big-number" style="font-size:28px;margin:0">{{ "{:,}".format(payments_cards|sum(attribute='consolidated')).replace(",", ".") }}</span>
-    </div>
-    <div class="muted">CDT netti consolidati area Payments</div>
+  <div class="area-summary">
+    <div><strong>Baseline Payments</strong><div class="muted">CDT netti consolidati disponibili per il confronto storico</div></div>
+    <div class="area-total">{{ "{:,}".format(payments_total).replace(",", ".") }}</div>
   </div>
   <div class="cards">
     {% for c in payments_cards %}
     <a class="system-card" href="{{ url_for('system_page', system_key=c.key) }}">
-      <div class="card-top">
-        <span class="system-badge">{{ c.label }}</span>
-        <span class="jira-key">{{ c.jira }}</span>
-      </div>
+      <div class="card-top"><span class="system-badge">{{ c.label }}</span><span class="jira-key">{{ c.jira }}</span></div>
       <div class="big-number">{{ "{:,}".format(c.consolidated).replace(",", ".") }}</div>
       <div class="muted">CDT netti consolidati</div>
-      <div class="card-footer">
-        <span class="muted">{{ c.last.period if c.last else ("Baseline" if c.consolidated else "Da inizializzare") }}</span>
-        <span class="icta">ICTA {{ "%.1f"|format(c.icta) }}%</span>
-      </div>
+      <div class="card-footer"><span class="muted">{{ c.last.period if c.last else ("Baseline" if c.consolidated else "Da inizializzare") }}</span><span class="icta">ICTA {{ "%.1f"|format(c.icta) }}%</span></div>
     </a>
     {% endfor %}
   </div>
-  <section class="panel query-panel">
-    <div class="panel-head">
-      <div><p class="eyebrow">JIRA / XRAY</p><h2>Query Payments del mese precedente</h2></div>
-      <button class="btn secondary" onclick="copyText('jira-query-payments', this)">Copia query</button>
-    </div>
-    <pre id="jira-query-payments">{{ query_payments }}</pre>
-  </section>
 </section>
+
 {% if recent %}
 <section class="panel">
   <div class="panel-head"><div><p class="eyebrow">STORICO</p><h2>Ultime analisi</h2></div></div>
@@ -95,18 +140,15 @@
       <thead><tr><th>Periodo</th><th>Sistema</th><th>Importati</th><th>Dup. pregresso</th><th>Dup. mese</th><th>Nuovi</th><th>Stato</th><th></th></tr></thead>
       <tbody>
       {% for r in recent %}
-        <tr>
-          <td>{{ r.period }}</td><td><b>{{ r.label }}</b></td><td>{{ r.imported_count }}</td>
-          <td>{{ r.duplicate_history_count }}</td><td>{{ r.duplicate_month_count }}</td><td>{{ r.new_count }}</td>
-          <td><span class="status {{ r.status }}">{{ r.status }}</span></td>
-          <td><a href="{{ url_for('report', run_id=r.id) }}">Excel</a></td>
-        </tr>
+        <tr><td>{{ r.period }}</td><td><b>{{ r.label }}</b></td><td>{{ r.imported_count }}</td><td>{{ r.duplicate_history_count }}</td><td>{{ r.duplicate_month_count }}</td><td>{{ r.new_count }}</td><td><span class="status {{ r.status }}">{{ r.status }}</span></td><td><a href="{{ url_for('report', run_id=r.id) }}">Excel</a></td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
 {% endif %}
+</div>
+
 <script>
 function switchArea(area){
   document.querySelectorAll('.area-tab').forEach(b => b.classList.toggle('active', b.dataset.area === area));
