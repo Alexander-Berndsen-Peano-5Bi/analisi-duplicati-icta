@@ -143,6 +143,9 @@ if DATABASE_URL:
             return CursorCompat(cur,last)
         def executemany(self,sql,rows):
             cur=self.raw.cursor(cursor_factory=DictCursor); cur.executemany(_translate(sql),rows); return CursorCompat(cur)
+        def executescript(self, script):
+            # Schema is initialized above for PostgreSQL; SQLite bootstrap scripts can be skipped.
+            return CursorCompat()
         def commit(self): self.raw.commit()
         def rollback(self): self.raw.rollback()
         def close(self): self.raw.close()
