@@ -1,4 +1,4 @@
-import os, re, sqlite3, gzip, base64
+import os, re, sqlite3, gzip, base64, hashlib
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
@@ -92,3 +92,11 @@ if DATABASE_URL:
 source_b64 = (BASE / "bundle" / "app_source.b64").read_text(encoding="ascii")
 source = gzip.decompress(base64.b64decode(source_b64)).decode("utf-8")
 exec(compile(source, str(BASE / "app_impl.py"), "exec"), globals())
+
+# Store and compare only SHA-256 fingerprints of normalized summaries.
+_plain_normalize_summary = normalize_summary
+def normalize_summary(text, ignore_platform=False):
+    normalized = _plain_normalize_summary(text, ignore_platform)
+    if not normalized:
+        return ""
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
