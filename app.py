@@ -53,8 +53,17 @@ def _pg_schema_and_seed(url):
       ("PWBE",3853,551,0),("FB",2450,392,0),("NSL",197,11,0),
       ("AMUW",0,0,0),("IR",0,0,0),("SMARTC",0,0,0),("AE",0,0,0),("PCE",0,0,0)
     ]
+    metrics=[
+      ("PA",1669,107,0),("NAW",3750,1871,0),("NUP",9148,2041,0),
+      ("PWBE",3853,551,0),("FB",2450,392,0),("NSL",197,11,0),
+      ("AMUW",24105,5167,0),("IR",159,1,0),("SMARTC",951,24,0),
+      ("AE",944,448,0),("PCE",4314,245,0)
+    ]
     execute_values(cur, """INSERT INTO system_metrics(system_key,baseline_gross,baseline_duplicates,automated_count)
-      VALUES %s ON CONFLICT(system_key) DO NOTHING""", metrics)
+      VALUES %s
+      ON CONFLICT(system_key) DO UPDATE SET
+        baseline_gross=EXCLUDED.baseline_gross,
+        baseline_duplicates=EXCLUDED.baseline_duplicates""", metrics)
     cur.execute("SELECT COUNT(*) FROM consolidated_tests")
     count=cur.fetchone()[0]
     if count == 0:
@@ -73,9 +82,45 @@ def _pg_schema_and_seed(url):
               (system_key,ticket_key,summary,normalized,source_period,created_at)
               VALUES %s ON CONFLICT(system_key,ticket_key) DO NOTHING""", records, page_size=1000)
         print(f"POSTGRES_SEED_IMPORTED={len(records)}", flush=True)
+    # Import encrypted Payments baseline on every boot (idempotent via unique ticket key).
+    payments_seed = BASE / "bundle" / "payments_seed.enc.b64"
+    payments_key = os.environ.get("PAYMENTS_SEED_KEY", "").strip()
+    if payments_seed.exists() and payments_key:
+        try:
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            key = base64.urlsafe_b64decode(payments_key.encode("ascii"))
+            encrypted = base64.b64decode(payments_seed.read_text(encoding="ascii").strip())
+            nonce, ciphertext = encrypted[:12], encrypted[12:]
+            compressed = AESGCM(key).decrypt(
+                nonce, ciphertext, b"analisi-duplicati-icta-payments-v1"
+            )
+            raw = gzip.decompress(compressed).decode("utf-8")
+            pay_records=[]
+            for line in raw.splitlines():
+                if not line.strip():
+                    continue
+                row=json.loads(line)
+                pay_records.append((
+                    row["system_key"], row["ticket_key"], row["summary"], row["normalized"],
+                    row.get("source_period","baseline-payments"),
+                    row.get("created_at","2026-09-25")
+                ))
+            if pay_records:
+                execute_values(cur, """INSERT INTO consolidated_tests
+                  (system_key,ticket_key,summary,normalized,source_period,created_at)
+                  VALUES %s ON CONFLICT(system_key,ticket_key) DO NOTHING""",
+                  pay_records, page_size=1000)
+            print(f"PAYMENTS_SEED_IMPORTED={len(pay_records)}", flush=True)
+        except Exception as e:
+            print(f"PAYMENTS_SEED_ERROR={type(e).__name__}: {e}", flush=True)
+
     conn.commit()
     cur.execute("SELECT COUNT(*) FROM consolidated_tests")
     print(f"POSTGRES_CONSOLIDATED_COUNT={cur.fetchone()[0]}", flush=True)
+    cur.execute("""SELECT system_key,COUNT(*) FROM consolidated_tests
+                   WHERE system_key IN ('AMUW','IR','SMARTC','AE','PCE')
+                   GROUP BY system_key ORDER BY system_key""")
+    print("PAYMENTS_COUNTS=" + json.dumps(dict(cur.fetchall())), flush=True)
     conn.close()
 
 if DATABASE_URL:
