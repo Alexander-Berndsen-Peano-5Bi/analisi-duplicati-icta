@@ -190,3 +190,18 @@ source_b64=(BASE/"bundle"/"app_source.b64").read_text(encoding="ascii")
 source=gzip.decompress(base64.b64decode(source_b64)).decode("utf-8")
 exec(compile(source,str(BASE/"app_impl.py"),"exec"),globals())
 print("BOOT_MARKER_AFTER_IMPL", flush=True)
+
+
+# PAYMENTS_DASHBOARD_FALLBACK
+# Keep approved Payments baseline visible even before the first monthly run.
+_original_system_stats = system_stats
+_PAYMENTS_APPROVED_NET = {
+    "PCE": 4069, "IR": 158, "SMARTC": 927, "AMUW": 18938, "AE": 496
+}
+def system_stats(conn, jira_key):
+    stats = _original_system_stats(conn, jira_key)
+    if jira_key in _PAYMENTS_APPROVED_NET and not stats.get("consolidated"):
+        stats["consolidated"] = _PAYMENTS_APPROVED_NET[jira_key]
+        automated = stats.get("automated_count", 0)
+        stats["icta"] = (automated / stats["consolidated"] * 100) if stats["consolidated"] else 0
+    return stats
