@@ -130,6 +130,9 @@ if DATABASE_URL:
         def close(self): self.raw.close()
 
     sqlite3.connect=lambda *args,**kwargs: PGConnection()
+    # Prevent the bundled v2.2 app from creating a second PostgreSQL adapter.
+    # It will keep using its normal SQLite API, transparently backed by PGConnection.
+    os.environ.pop("DATABASE_URL", None)
 
 source_b64=(BASE/"bundle"/"app_source.b64").read_text(encoding="ascii")
 source=gzip.decompress(base64.b64decode(source_b64)).decode("utf-8")
