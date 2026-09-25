@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}QA Test Case Scrematura{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a href="{{ url_for('home') }}" class="brand">
+      <span class="logo">QA</span>
+      <span><strong>Test Case Scrematura</strong><small>Duplicate control portal</small></span>
+    </a>
+    <nav>
+      <a href="{{ url_for('home') }}">Dashboard</a>
+      <a class="btn small" href="{{ url_for('upload') }}">+ Importa CSV</a>
+    </nav>
+  </header>
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    async function refreshQuery(periodInputId, targetId) {
+      const period = document.getElementById(periodInputId).value;
+      const res = await fetch(`/api/query?period=${encodeURIComponent(period)}`);
+      const data = await res.json();
+      if (data.query) document.getElementById(targetId).textContent = data.query;
+    }
+    async function copyText(id, btn) {
+      const text = document.getElementById(id).textContent;
+      await navigator.clipboard.writeText(text);
+      const old = btn.textContent;
+      btn.textContent = "Copiata ✓";
+      setTimeout(() => btn.textContent = old, 1200);
+    }
+  </script>
+</body>
+</html>
