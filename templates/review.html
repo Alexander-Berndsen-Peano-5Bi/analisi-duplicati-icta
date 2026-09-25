@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Risultato analisi | QA Scrematura{% endblock %}
+{% block content %}
+<section class="page-title">
+  <p class="eyebrow">RISULTATO IMPORT</p>
+  <h1>Analisi completata</h1>
+  <p>Controlla i risultati prima di aggiornare il consolidato usato per i confronti futuri.</p>
+</section>
+
+{% if ignored %}
+<div class="alert subtle"><div><strong>{{ ignored }} righe ignorate</strong><span>Chiave ticket non riconosciuta tra i sistemi configurati.</span></div></div>
+{% endif %}
+
+<div class="results-grid">
+{% for r in runs %}
+  <section class="result-card">
+    <div class="card-top">
+      <span class="system-badge">{{ r.label }}</span>
+      <span class="jira-key">{{ r.period }}</span>
+    </div>
+    <div class="metric-list">
+      <div><span>CDT importati</span><b>{{ r.imported_count }}</b></div>
+      <div><span>Duplicati del pregresso</span><b>{{ r.duplicate_history_count }}</b></div>
+      <div><span>Duplicati interni al mese</span><b>{{ r.duplicate_month_count }}</b></div>
+      <div class="accent"><span>Duplicati totali</span><b>{{ r.duplicate_history_count + r.duplicate_month_count }}</b></div>
+      <div class="success-line"><span>Nuovi CDT netti</span><b>{{ r.new_count }}</b></div>
+    </div>
+    <a class="btn secondary full" href="{{ url_for('report', run_id=r.id) }}">Scarica report Excel</a>
+  </section>
+{% endfor %}
+</div>
+
+<div class="action-bar">
+  <form method="post" action="{{ url_for('discard') }}">
+    <input type="hidden" name="run_ids" value="{{ runs|map(attribute='id')|join(',') }}">
+    <button class="btn ghost" type="submit">Annulla import</button>
+  </form>
+  <form method="post" action="{{ url_for('consolidate') }}">
+    <input type="hidden" name="run_ids" value="{{ runs|map(attribute='id')|join(',') }}">
+    <button class="btn primary" type="submit">Conferma e aggiorna consolidato</button>
+  </form>
+</div>
+{% endblock %}
