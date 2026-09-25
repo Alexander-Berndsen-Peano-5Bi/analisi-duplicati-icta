@@ -179,6 +179,8 @@ if DATABASE_URL:
     # It will keep using its normal SQLite API, transparently backed by PGConnection.
     os.environ.pop("DATABASE_URL", None)
 
+print("BOOT_MARKER_BEFORE_IMPL", flush=True)
 source_b64=(BASE/"bundle"/"app_source.b64").read_text(encoding="ascii")
 source=gzip.decompress(base64.b64decode(source_b64)).decode("utf-8")
 exec(compile(source,str(BASE/"app_impl.py"),"exec"),globals())
+print("BOOT_MARKER_AFTER_IMPL", flush=True)
