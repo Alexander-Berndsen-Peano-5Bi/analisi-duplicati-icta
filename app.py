@@ -99,6 +99,9 @@ if DATABASE_URL:
         if re.match(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\b", q, flags=re.I):
             q=re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO","INSERT INTO",q,count=1,flags=re.I)
             q=q.rstrip().rstrip(";")+" ON CONFLICT DO NOTHING"
+        if re.match(r"^\s*INSERT\s+OR\s+REPLACE\s+INTO\b", q, flags=re.I):
+            q=re.sub(r"INSERT\s+OR\s+REPLACE\s+INTO","INSERT INTO",q,count=1,flags=re.I)
+            q=q.rstrip().rstrip(";")+" ON CONFLICT DO NOTHING"
         return q
 
     class PGConnection:
