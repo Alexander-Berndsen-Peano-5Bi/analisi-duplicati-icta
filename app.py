@@ -58,45 +58,21 @@ def _pg_schema_and_seed(url):
     cur.execute("SELECT COUNT(*) FROM consolidated_tests")
     count=cur.fetchone()[0]
     if count == 0:
-        seed = BASE / "bundle" / "seed_01.part"
-        imported=0
-        if seed.exists():
-            try:
-                raw=gzip.decompress(base64.b64decode(seed.read_text(encoding="ascii").strip()))
-                records=[]
-                if raw.startswith(b"SQLite format 3"):
-                    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-                        tmp.write(raw); tmp_path=tmp.name
-                    sc=REAL_SQLITE_CONNECT(tmp_path)
-                    records=sc.execute("""SELECT system_key,ticket_key,summary,normalized,source_period,created_at
-                                          FROM consolidated_tests ORDER BY id""").fetchall()
-                    sc.close()
-                    os.unlink(tmp_path)
-                else:
-                    text=raw.decode("utf-8")
-                    try:
-                        obj=json.loads(text)
-                        if isinstance(obj,dict): obj=obj.get("consolidated_tests",obj.get("rows",[]))
-                        records=[tuple(x[:6]) for x in obj] if isinstance(obj,list) else []
-                    except Exception:
-                        for line in text.splitlines():
-                            if not line.strip(): continue
-                            try:
-                                x=json.loads(line); records.append(tuple(x[:6]))
-                            except Exception:
-                                parts=line.split("\t")
-                                if len(parts)>=4:
-                                    records.append((parts[0],parts[1],parts[2],parts[3],
-                                                    parts[4] if len(parts)>4 else "baseline",
-                                                    parts[5] if len(parts)>5 else "2026-09-25"))
-                if records:
-                    execute_values(cur, """INSERT INTO consolidated_tests
-                      (system_key,ticket_key,summary,normalized,source_period,created_at)
-                      VALUES %s ON CONFLICT(system_key,ticket_key) DO NOTHING""", records, page_size=1000)
-                    imported=len(records)
-                print(f"POSTGRES_SEED_IMPORTED={imported}", flush=True)
-            except Exception as e:
-                print(f"POSTGRES_SEED_ERROR={type(e).__name__}: {e}", flush=True)
+        records=[]
+        seed_dir = BASE / "seed"
+        for seed in sorted(seed_dir.glob("baseline_*.tsv")):
+            for line in seed.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                parts=line.split("\t")
+                if len(parts) >= 3:
+                    system_key, ticket_key, normalized = parts[0], parts[1], parts[2]
+                    records.append((system_key, ticket_key, normalized, normalized, "baseline", "2026-09-25"))
+        if records:
+            execute_values(cur, """INSERT INTO consolidated_tests
+              (system_key,ticket_key,summary,normalized,source_period,created_at)
+              VALUES %s ON CONFLICT(system_key,ticket_key) DO NOTHING""", records, page_size=1000)
+        print(f"POSTGRES_SEED_IMPORTED={len(records)}", flush=True)
     conn.commit()
     cur.execute("SELECT COUNT(*) FROM consolidated_tests")
     print(f"POSTGRES_CONSOLIDATED_COUNT={cur.fetchone()[0]}", flush=True)
