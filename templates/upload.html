@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Importa CSV | QA Scrematura{% endblock %}
+{% block content %}
+<section class="page-title">
+  <p class="eyebrow">NUOVA ANALISI</p>
+  <h1>Importa l’export Jira</h1>
+  <p>Puoi caricare un unico CSV con più sistemi. Il portale li riconosce dalla chiave ticket e li analizza separatamente.</p>
+</section>
+<div class="two-col">
+  <section class="panel">
+    <h2>1. Esporta da Jira</h2>
+    <label>Mese da analizzare</label>
+    <input id="period" type="month" value="{{ period }}" onchange="refreshQuery('period','jira-query')">
+    <pre id="jira-query">{{ query }}</pre>
+    <button class="btn secondary" onclick="copyText('jira-query', this)">Copia query Jira</button>
+    <p class="hint">Nell’export devono esserci almeno le colonne <b>Chiave di ticket</b> e <b>Riepilogo</b>.</p>
+  </section>
+  <section class="panel upload-panel">
+    <h2>2. Carica il CSV</h2>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="period" id="period-hidden" value="{{ period }}">
+      <label class="dropzone">
+        <input name="csv_file" type="file" accept=".csv,text/csv" required>
+        <span class="drop-icon">⇧</span>
+        <strong>Seleziona il CSV Jira</strong>
+        <small>CSV con uno o più sistemi</small>
+      </label>
+      <button class="btn primary full" type="submit">Analizza duplicati</button>
+    </form>
+  </section>
+</div>
+<section class="panel">
+  <h2>Riconoscimento automatico</h2>
+  <div class="mapping-grid">
+    <span><b>NUP-</b> → NUP</span><span><b>NAW-</b> → NAW</span><span><b>NSL-</b> → NSL</span>
+    <span><b>PA-</b> → PA</span><span><b>PWBE-</b> → FLEXBEN</span><span><b>FB-</b> → FB</span><span><b>AMUW-</b> → AMUW</span><span><b>IR-</b> → IR</span><span><b>SMARTC-</b> → SMARTC</span><span><b>AE-</b> → AE</span><span><b>PCE-</b> → PCE</span>
+  </div>
+  <p class="hint"><b>Regola speciale NAW:</b> MOBILE, iOS, Android, iPhone e iPad non sono considerati elementi distintivi.</p>
+</section>
+<script>
+  const p = document.getElementById('period');
+  const h = document.getElementById('period-hidden');
+  p.addEventListener('change', () => h.value = p.value);
+</script>
+{% endblock %}
