@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | QA Scrematura{% endblock %}
+{% block content %}
+<section class="hero hero-dashboard">
+  <div>
+    <p class="eyebrow">QA CONTROL CENTER</p>
+    <h1>Scrematura mensile dei test case</h1>
+    <p>Un unico export Jira, riconoscimento automatico dei sistemi, confronto con lo storico e copertura automatica sempre visibile.</p>
+  </div>
+  <a class="btn primary" href="{{ url_for('upload', period=target) }}">Importa CSV mensile</a>
+</section>
+{% if alert %}
+<div class="alert">
+  <div>
+    <strong>Analisi mensile da effettuare</strong>
+    <span>Non risulta ancora completato l’import del mese precedente: <b>{{ alert.period }}</b>.</span>
+  </div>
+  <a class="btn warning" href="{{ url_for('upload', period=alert.period) }}">Vai all’import</a>
+</div>
+{% endif %}
+<div class="area-tabs">
+  <button class="area-tab active" data-area="welfare" onclick="switchArea('welfare')">Area Welfare</button>
+  <button class="area-tab" data-area="payments" onclick="switchArea('payments')">Area Payments</button>
+</div>
+<section id="area-welfare" class="area-panel active">
+  <div class="section-head section-head-actions">
+    <div><p class="eyebrow">AREA WELFARE</p><h2>Sistemi censiti</h2></div>
+    <a class="btn secondary report-area-btn" href="{{ url_for('area_report', area='welfare') }}">Scarica report Excel Area</a>
+  </div>
+  <div class="cards">
+    {% for c in welfare_cards %}
+    <a class="system-card" href="{{ url_for('system_page', system_key=c.key) }}">
+      <div class="card-top">
+        <span class="system-badge">{{ c.label }}</span>
+        <span class="jira-key">{{ c.jira }}</span>
+      </div>
+      <div class="big-number">{{ "{:,}".format(c.consolidated).replace(",", ".") }}</div>
+      <div class="muted">CDT netti consolidati</div>
+      <div class="card-footer">
+        <span class="muted">{{ c.last.period if c.last else "Baseline" }}</span>
+        <span class="icta">ICTA {{ "%.1f"|format(c.icta) }}%</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  <section class="panel query-panel">
+    <div class="panel-head">
+      <div><p class="eyebrow">JIRA / XRAY</p><h2>Query Welfare del mese precedente</h2></div>
+      <button class="btn secondary" onclick="copyText('jira-query-welfare', this)">Copia query</button>
+    </div>
+    <pre id="jira-query-welfare">{{ query_welfare }}</pre>
+  </section>
+</section>
+<section id="area-payments" class="area-panel">
+  <div class="section-head section-head-actions">
+    <div><p class="eyebrow">AREA PAYMENTS</p><h2>Sistemi censiti</h2></div>
+    <a class="btn secondary report-area-btn" href="{{ url_for('area_report', area='payments') }}">Scarica report Excel Area</a>
+  </div>
+  <div class="cards">
+    {% for c in payments_cards %}
+    <a class="system-card" href="{{ url_for('system_page', system_key=c.key) }}">
+      <div class="card-top">
+        <span class="system-badge">{{ c.label }}</span>
+        <span class="jira-key">{{ c.jira }}</span>
+      </div>
+      <div class="big-number">{{ "{:,}".format(c.consolidated).replace(",", ".") }}</div>
+      <div class="muted">CDT netti consolidati</div>
+      <div class="card-footer">
+        <span class="muted">{{ c.last.period if c.last else "Da inizializzare" }}</span>
+        <span class="icta">ICTA {{ "%.1f"|format(c.icta) }}%</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  <section class="panel query-panel">
+    <div class="panel-head">
+      <div><p class="eyebrow">JIRA / XRAY</p><h2>Query Payments del mese precedente</h2></div>
+      <button class="btn secondary" onclick="copyText('jira-query-payments', this)">Copia query</button>
+    </div>
+    <pre id="jira-query-payments">{{ query_payments }}</pre>
+  </section>
+</section>
+{% if recent %}
+<section class="panel">
+  <div class="panel-head"><div><p class="eyebrow">STORICO</p><h2>Ultime analisi</h2></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Periodo</th><th>Sistema</th><th>Importati</th><th>Dup. pregresso</th><th>Dup. mese</th><th>Nuovi</th><th>Stato</th><th></th></tr></thead>
+      <tbody>
+      {% for r in recent %}
+        <tr>
+          <td>{{ r.period }}</td><td><b>{{ r.label }}</b></td><td>{{ r.imported_count }}</td>
+          <td>{{ r.duplicate_history_count }}</td><td>{{ r.duplicate_month_count }}</td><td>{{ r.new_count }}</td>
+          <td><span class="status {{ r.status }}">{{ r.status }}</span></td>
+          <td><a href="{{ url_for('report', run_id=r.id) }}">Excel</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+<script>
+function switchArea(area){
+  document.querySelectorAll('.area-tab').forEach(b => b.classList.toggle('active', b.dataset.area === area));
+  document.querySelectorAll('.area-panel').forEach(p => p.classList.toggle('active', p.id === 'area-' + area));
+}
+</script>
+{% endblock %}
