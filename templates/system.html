@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ cfg.label }} | QA Scrematura{% endblock %}
+{% block content %}
+<section class="system-hero">
+  <div><div class="breadcrumb">{{ "Area Welfare" if cfg.area == "welfare" else "Area Payments" }} / {{ cfg.label }}</div><h1>{{ cfg.label }}</h1><p>Project key Jira <b>{{ cfg.jira }}</b></p></div>
+  <a class="btn blue" href="{{ url_for('upload') }}">Importa CSV</a>
+</section>
+<div class="kpi-grid-large">
+  <div class="kpi-card"><span>Test case iniziali lordi</span><b>{{ stats.gross }}</b></div>
+  <div class="kpi-card"><span>Duplicati baseline</span><b>{{ stats.baseline_duplicates }}</b><small>{{ "%.1f"|format(stats.duplicate_pct) }}%</small></div>
+  <div class="kpi-card strong"><span>Test case netti</span><b>{{ consolidated }}</b></div>
+  <div class="kpi-card icta-card"><span>ICTA</span><b>{{ "%.1f"|format(stats.icta) }}%</b><small>{{ stats.automated_count }} automatici</small></div>
+</div>
+<section class="panel">
+  <h2>Copertura test automatici</h2>
+  <form method="post" action="{{ url_for('update_automation', system_key=system_key) }}" class="automation-form">
+    <div><label>Numero test automatici</label><input type="number" name="automated_count" min="0" value="{{ stats.automated_count }}" required></div>
+    <button class="btn blue" type="submit">Aggiorna ICTA</button>
+  </form>
+</section>
+<section class="panel"><div class="panel-head"><h2>Query mensile</h2><button class="btn secondary" onclick="copyText('jira-query', this)">Copia</button></div><pre id="jira-query">{{ query }}</pre></section>
+<section class="panel"><h2>Storico analisi</h2>
+{% if history %}<div class="table-wrap"><table><thead><tr><th>Periodo</th><th>Importati</th><th>Dup. pregresso</th><th>Dup. mese</th><th>Nuovi</th><th>Stato</th><th>Report</th></tr></thead><tbody>
+{% for r in history %}<tr><td>{{ r.period }}</td><td>{{ r.imported_count }}</td><td>{{ r.duplicate_history_count }}</td><td>{{ r.duplicate_month_count }}</td><td>{{ r.new_count }}</td><td>{{ r.status }}</td><td><a href="{{ url_for('report', run_id=r.id) }}">Excel</a></td></tr>{% endfor %}
+</tbody></table></div>{% else %}<div class="empty-state">Nessuna analisi mensile registrata.</div>{% endif %}
+</section>
+{% endblock %}
