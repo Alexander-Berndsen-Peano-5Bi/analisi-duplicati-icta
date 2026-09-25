@@ -179,6 +179,12 @@ if DATABASE_URL:
     # It will keep using its normal SQLite API, transparently backed by PGConnection.
     os.environ.pop("DATABASE_URL", None)
 
+# HOSTED_DB_BOOTSTRAP_MARKER: the bundled legacy app checks whether its local
+# SQLite path exists before running a 16k-row seed. PostgreSQL has already been
+# initialized above, so create only the marker file and skip that legacy seed.
+_data_dir = BASE / "data"
+_data_dir.mkdir(parents=True, exist_ok=True)
+(_data_dir / "app.db").touch(exist_ok=True)
 print("BOOT_MARKER_BEFORE_IMPL", flush=True)
 source_b64=(BASE/"bundle"/"app_source.b64").read_text(encoding="ascii")
 source=gzip.decompress(base64.b64decode(source_b64)).decode("utf-8")
