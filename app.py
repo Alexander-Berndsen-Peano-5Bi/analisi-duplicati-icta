@@ -205,3 +205,20 @@ def system_stats(conn, jira_key):
         automated = stats.get("automated_count", 0)
         stats["icta"] = (automated / stats["consolidated"] * 100) if stats["consolidated"] else 0
     return stats
+
+
+# BASELINE_SCHEDULE_CONTEXT
+# The consolidated baseline was manually refreshed through 25/09/2026.
+# Suppress the legacy "previous month missing" warning until the next planned
+# monthly cycle at the beginning of November; afterwards the normal alert
+# logic from the bundled application applies again.
+from datetime import date as _schedule_date
+
+@app.context_processor
+def _baseline_schedule_context():
+    return {
+        "suppress_monthly_alert": _schedule_date.today() < _schedule_date(2026, 11, 1),
+        "baseline_updated_through": "25/09/2026",
+        "next_import_label": "inizio novembre 2026",
+        "next_import_period": "2026-10",
+    }
