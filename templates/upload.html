@@ -1,45 +1,315 @@
 {% extends "base.html" %}
 {% block title %}Importa CSV | QA Scrematura{% endblock %}
 {% block content %}
-<section class="page-title">
-  <p class="eyebrow">NUOVA ANALISI</p>
-  <h1>Importa l’export Jira</h1>
-  <p>Puoi caricare un unico CSV con più sistemi. Il portale li riconosce dalla chiave ticket e li analizza separatamente.</p>
-</section>
-<div class="two-col">
-  <section class="panel">
-    <h2>1. Esporta da Jira</h2>
-    <label>Mese da analizzare</label>
-    <input id="period" type="month" value="{{ period }}" onchange="refreshQuery('period','jira-query')">
-    <pre id="jira-query">{{ query }}</pre>
-    <button class="btn secondary" onclick="copyText('jira-query', this)">Copia query Jira</button>
-    <p class="hint">Nell’export devono esserci almeno le colonne <b>Chiave di ticket</b> e <b>Riepilogo</b>.</p>
+<style>
+.import-page, .import-page * { box-sizing: border-box; }
+
+.import-page {
+  display: grid;
+  gap: 22px;
+  padding-bottom: 24px;
+}
+
+.import-head {
+  max-width: 920px;
+  margin: 4px 0 2px;
+}
+.import-head .eyebrow { margin: 0 0 7px; }
+.import-head h1 {
+  margin: 0;
+  font-size: clamp(30px, 3.2vw, 42px);
+  line-height: 1.08;
+}
+.import-head > p:last-child {
+  margin: 10px 0 0;
+  color: #536b84;
+  line-height: 1.5;
+  max-width: 860px;
+}
+
+.import-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.import-card {
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #dce6f0;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 6px 18px rgba(26, 61, 100, .05);
+  display: flex;
+  flex-direction: column;
+}
+.import-card h2 {
+  margin: 0 0 20px;
+  font-size: 23px;
+  color: #173b66;
+}
+.import-card label.field-label {
+  display: block;
+  margin-bottom: 7px;
+  color: #294866;
+  font-weight: 700;
+}
+.import-card input[type="month"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 16px;
+}
+
+.jira-query {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: #102a40;
+  color: #e4eef7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
+  font-size: 13px;
+  line-height: 1.38;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.card-actions .btn {
+  margin: 0 !important;
+}
+
+.import-hint {
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid #edf2f7;
+  color: #60758b;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.upload-form {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.upload-dropzone {
+  width: 100%;
+  min-width: 0;
+  min-height: 245px;
+  padding: 30px 22px;
+  border: 2px dashed #b9cee2;
+  border-radius: 15px;
+  background: #f8fbfe;
+  color: #183b63;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+.upload-dropzone:hover {
+  border-color: #4d83b7;
+  background: #f2f7fc;
+}
+.upload-dropzone:focus-within {
+  outline: 3px solid rgba(45, 106, 165, .13);
+  outline-offset: 2px;
+}
+.upload-dropzone input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.upload-icon {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 13px;
+  border-radius: 12px;
+  background: #e8f1fa;
+  display: grid;
+  place-items: center;
+  font-size: 23px;
+  color: #1f5d96;
+}
+.upload-dropzone strong {
+  display: block;
+  font-size: 17px;
+  margin-bottom: 4px;
+}
+.upload-dropzone small {
+  color: #71869b;
+  font-size: 13px;
+}
+.file-name {
+  display: none;
+  margin-top: 11px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eaf3fb;
+  color: #245a8c;
+  font-size: 12px;
+  font-weight: 700;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.file-name.visible { display: inline-block; }
+
+.upload-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-start;
+}
+.upload-actions .btn {
+  margin: 0 !important;
+  min-width: 178px;
+}
+
+.recognition-card {
+  background: #fff;
+  border: 1px solid #e0e8f1;
+  border-radius: 16px;
+  padding: 20px 22px;
+}
+.recognition-card h2 {
+  margin: 0 0 14px;
+  font-size: 19px;
+}
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.mapping-grid span {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e4ebf3;
+  border-radius: 9px;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #49637d;
+  text-align: center;
+}
+.mapping-grid b { color: #174f85; }
+.recognition-note {
+  margin: 13px 0 0;
+  color: #667b90;
+  font-size: 13px;
+}
+
+@media (max-width: 1050px) {
+  .mapping-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .import-grid { grid-template-columns: 1fr; }
+  .import-card { padding: 20px; }
+  .upload-dropzone { min-height: 210px; }
+  .mapping-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .import-card { padding: 17px; border-radius: 14px; }
+  .import-card h2 { font-size: 20px; }
+  .mapping-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card-actions, .upload-actions { align-items: stretch; flex-direction: column; }
+  .card-actions .btn, .upload-actions .btn { width: 100%; }
+}
+</style>
+
+<div class="import-page">
+  <section class="import-head">
+    <p class="eyebrow">NUOVA ANALISI</p>
+    <h1>Importa l’export Jira</h1>
+    <p>Carica un unico CSV con Welfare e Payments: il portale riconosce automaticamente il sistema dalla chiave ticket e analizza ogni area separatamente.</p>
   </section>
-  <section class="panel upload-panel">
-    <h2>2. Carica il CSV</h2>
-    <form method="post" enctype="multipart/form-data">
-      <input type="hidden" name="period" id="period-hidden" value="{{ period }}">
-      <label class="dropzone">
-        <input name="csv_file" type="file" accept=".csv,text/csv" required>
-        <span class="drop-icon">⇧</span>
-        <strong>Seleziona il CSV Jira</strong>
-        <small>CSV con uno o più sistemi</small>
-      </label>
-      <button class="btn primary full" type="submit">Analizza duplicati</button>
-    </form>
+
+  <div class="import-grid">
+    <section class="import-card">
+      <h2>1. Esporta da Jira</h2>
+
+      <label class="field-label" for="period">Mese da analizzare</label>
+      <input id="period" type="month" value="{{ period }}" onchange="refreshQuery('period','jira-query')">
+
+      <pre class="jira-query" id="jira-query">{{ query }}</pre>
+
+      <div class="card-actions">
+        <button class="btn secondary" type="button" onclick="copyText('jira-query', this)">Copia query Jira</button>
+      </div>
+
+      <p class="import-hint">Nell’export devono essere presenti almeno le colonne <b>Chiave di ticket</b> e <b>Riepilogo</b>.</p>
+    </section>
+
+    <section class="import-card">
+      <h2>2. Carica il CSV</h2>
+
+      <form class="upload-form" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="period" id="period-hidden" value="{{ period }}">
+
+        <label class="upload-dropzone" for="csv-file">
+          <input id="csv-file" name="csv_file" type="file" accept=".csv,text/csv" required>
+          <span class="upload-icon">⇧</span>
+          <strong>Seleziona il CSV Jira</strong>
+          <small>Un unico file con uno o più sistemi</small>
+          <span class="file-name" id="file-name"></span>
+        </label>
+
+        <div class="upload-actions">
+          <button class="btn primary" type="submit">Analizza duplicati</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <section class="recognition-card">
+    <h2>Riconoscimento automatico</h2>
+    <div class="mapping-grid">
+      <span><b>NUP-</b> → NUP</span>
+      <span><b>NAW-</b> → NAW</span>
+      <span><b>NSL-</b> → NSL</span>
+      <span><b>PA-</b> → PA</span>
+      <span><b>PWBE-</b> → FLEXBEN</span>
+      <span><b>FB-</b> → FB</span>
+      <span><b>AMUW-</b> → AMUW</span>
+      <span><b>IR-</b> → IR</span>
+      <span><b>SMARTC-</b> → SMARTC</span>
+      <span><b>AE-</b> → AE</span>
+      <span><b>PCE-</b> → PCE</span>
+    </div>
+    <p class="recognition-note"><b>Regola speciale NAW:</b> MOBILE, iOS, Android, iPhone e iPad non sono considerati elementi distintivi.</p>
   </section>
 </div>
-<section class="panel">
-  <h2>Riconoscimento automatico</h2>
-  <div class="mapping-grid">
-    <span><b>NUP-</b> → NUP</span><span><b>NAW-</b> → NAW</span><span><b>NSL-</b> → NSL</span>
-    <span><b>PA-</b> → PA</span><span><b>PWBE-</b> → FLEXBEN</span><span><b>FB-</b> → FB</span><span><b>AMUW-</b> → AMUW</span><span><b>IR-</b> → IR</span><span><b>SMARTC-</b> → SMARTC</span><span><b>AE-</b> → AE</span><span><b>PCE-</b> → PCE</span>
-  </div>
-  <p class="hint"><b>Regola speciale NAW:</b> MOBILE, iOS, Android, iPhone e iPad non sono considerati elementi distintivi.</p>
-</section>
+
 <script>
   const p = document.getElementById('period');
   const h = document.getElementById('period-hidden');
+  const fileInput = document.getElementById('csv-file');
+  const fileName = document.getElementById('file-name');
+
   p.addEventListener('change', () => h.value = p.value);
+
+  fileInput.addEventListener('change', () => {
+    const selected = fileInput.files && fileInput.files[0];
+    if (selected) {
+      fileName.textContent = selected.name;
+      fileName.classList.add('visible');
+    } else {
+      fileName.textContent = '';
+      fileName.classList.remove('visible');
+    }
+  });
 </script>
 {% endblock %}
