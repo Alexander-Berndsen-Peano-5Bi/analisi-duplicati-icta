@@ -109,7 +109,14 @@
   <a class="btn primary" href="{{ url_for('upload', period=target) }}">+ Importa CSV mensile</a>
 </section>
 
-{% if alert %}
+{% if suppress_monthly_alert %}
+<div class="alert" style="background:#eef5fc;border-color:#cfdeee;color:#274d73">
+  <div>
+    <strong>Baseline aggiornata</strong>
+    <span>Dati consolidati aggiornati al <b>{{ baseline_updated_through }}</b>. Prossimo import previsto a <b>{{ next_import_label }}</b> per il periodo <b>{{ next_import_period }}</b>.</span>
+  </div>
+</div>
+{% elif alert %}
 <div class="alert">
   <div>
     <strong>Analisi mensile da effettuare</strong>
