@@ -123,8 +123,123 @@ def _pg_schema_and_seed(url):
     print("PAYMENTS_COUNTS=" + json.dumps(dict(cur.fetchall())), flush=True)
     conn.close()
 
+
+def _init_local_fallback():
+    """Build an ephemeral read-only baseline when the remote DB is unavailable."""
+    db_path = BASE / "data" / "app.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if db_path.exists():
+            db_path.unlink()
+    except Exception:
+        pass
+    conn = REAL_SQLITE_CONNECT(db_path)
+    cur = conn.cursor()
+    cur.executescript("""
+    CREATE TABLE IF NOT EXISTS consolidated_tests(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      system_key TEXT NOT NULL,
+      ticket_key TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      normalized TEXT NOT NULL,
+      source_period TEXT,
+      created_at TEXT NOT NULL,
+      UNIQUE(system_key,ticket_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_consolidated_sys_norm ON consolidated_tests(system_key,normalized);
+    CREATE TABLE IF NOT EXISTS runs(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, period TEXT NOT NULL, system_key TEXT NOT NULL,
+      imported_count INTEGER NOT NULL, duplicate_history_count INTEGER NOT NULL DEFAULT 0,
+      duplicate_month_count INTEGER NOT NULL DEFAULT 0, new_count INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL, consolidated_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS run_rows(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL, ticket_key TEXT, summary TEXT,
+      normalized TEXT, status TEXT, group_id TEXT, primary_ticket TEXT, source_row INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS duplicate_groups(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL, group_id TEXT, primary_ticket TEXT,
+      primary_summary TEXT, group_size INTEGER, duplicates INTEGER, group_type TEXT
+    );
+    CREATE TABLE IF NOT EXISTS duplicate_mappings(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL, group_id TEXT, primary_ticket TEXT,
+      primary_summary TEXT, duplicate_ticket TEXT, duplicate_summary TEXT, duplicate_type TEXT
+    );
+    CREATE TABLE IF NOT EXISTS monthly_imports(
+      period TEXT PRIMARY KEY, status TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS system_metrics(
+      system_key TEXT PRIMARY KEY, baseline_gross INTEGER NOT NULL DEFAULT 0,
+      baseline_duplicates INTEGER NOT NULL DEFAULT 0, automated_count INTEGER NOT NULL DEFAULT 0
+    );
+    """)
+    metrics=[
+      ("PA",1669,107,0),("NAW",3750,1871,0),("NUP",9148,2041,0),
+      ("PWBE",3853,551,0),("FB",2450,392,0),("NSL",197,11,0),
+      ("AMUW",24105,5167,0),("IR",159,1,0),("SMARTC",951,24,0),
+      ("AE",944,448,0),("PCE",4314,245,0)
+    ]
+    cur.executemany("""INSERT OR REPLACE INTO system_metrics
+      (system_key,baseline_gross,baseline_duplicates,automated_count)
+      VALUES (?,?,?,?)""", metrics)
+
+    welfare=[]
+    seed_dir = BASE / "seed"
+    for seed in sorted(seed_dir.glob("baseline_*.tsv")):
+        for line in seed.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            parts=line.split("\t")
+            if len(parts) >= 3:
+                system_key, ticket_key, normalized = parts[0], parts[1], parts[2]
+                welfare.append((system_key,ticket_key,normalized,normalized,"baseline","2026-09-25"))
+    cur.executemany("""INSERT OR IGNORE INTO consolidated_tests
+      (system_key,ticket_key,summary,normalized,source_period,created_at)
+      VALUES (?,?,?,?,?,?)""", welfare)
+
+    payments_seed = BASE / "bundle" / "payments_seed.enc.b64"
+    payments_key = os.environ.get("PAYMENTS_SEED_KEY", "").strip()
+    if payments_seed.exists() and payments_key:
+        try:
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            key = base64.urlsafe_b64decode(payments_key.encode("ascii"))
+            encrypted = base64.b64decode(payments_seed.read_text(encoding="ascii").strip())
+            nonce, ciphertext = encrypted[:12], encrypted[12:]
+            compressed = AESGCM(key).decrypt(
+                nonce, ciphertext, b"analisi-duplicati-icta-payments-v1"
+            )
+            raw = gzip.decompress(compressed).decode("utf-8")
+            payments=[]
+            for line in raw.splitlines():
+                if not line.strip():
+                    continue
+                row=json.loads(line)
+                payments.append((
+                    row["system_key"], row["ticket_key"], row["summary"], row["normalized"],
+                    row.get("source_period","baseline-payments"),
+                    row.get("created_at","2026-09-25")
+                ))
+            cur.executemany("""INSERT OR IGNORE INTO consolidated_tests
+              (system_key,ticket_key,summary,normalized,source_period,created_at)
+              VALUES (?,?,?,?,?,?)""", payments)
+        except Exception as e:
+            print(f"LOCAL_PAYMENTS_SEED_ERROR={type(e).__name__}: {e}", flush=True)
+
+    conn.commit()
+    cur.execute("SELECT COUNT(*) FROM consolidated_tests")
+    print(f"LOCAL_FALLBACK_COUNT={cur.fetchone()[0]}", flush=True)
+    conn.close()
+
+
+PG_ACTIVE = False
 if DATABASE_URL:
-    _pg_schema_and_seed(DATABASE_URL)
+    try:
+        _pg_schema_and_seed(DATABASE_URL)
+        PG_ACTIVE = True
+    except Exception as e:
+        print(f"POSTGRES_UNAVAILABLE={type(e).__name__}: {e}", flush=True)
+
+if PG_ACTIVE:
     import psycopg2
     from psycopg2.extras import DictCursor
 
@@ -179,6 +294,10 @@ if DATABASE_URL:
     # It will keep using its normal SQLite API, transparently backed by PGConnection.
     os.environ.pop("DATABASE_URL", None)
 
+if not PG_ACTIVE:
+    _init_local_fallback()
+    print("LOCAL_FALLBACK_READY=1", flush=True)
+
 # HOSTED_DB_BOOTSTRAP_MARKER: the bundled legacy app checks whether its local
 # SQLite path exists before running a 16k-row seed. PostgreSQL has already been
 # initialized above, so create only the marker file and skip that legacy seed.
@@ -222,3 +341,17 @@ def _baseline_schedule_context():
         "next_import_label": "inizio novembre 2026",
         "next_import_period": "2026-10",
     }
+
+
+@app.context_processor
+def _database_status_context():
+    return {"database_degraded": not PG_ACTIVE}
+
+if not PG_ACTIVE:
+    from flask import request as _request, flash as _flash, redirect as _redirect, url_for as _url_for
+
+    @app.before_request
+    def _block_writes_while_database_is_offline():
+        if _request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            _flash("Database persistente temporaneamente non disponibile: import disabilitato per proteggere i dati.", "warning")
+            return _redirect(_request.referrer or _url_for("home"))
