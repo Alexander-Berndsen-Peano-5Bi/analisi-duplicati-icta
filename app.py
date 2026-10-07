@@ -5,6 +5,16 @@ BASE = Path(__file__).resolve().parent
 REAL_SQLITE_CONNECT = sqlite3.connect
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
+def _database_url_candidates(url):
+    """Try the configured Aiven hostname and the alternate public/dynamic hostname."""
+    candidates=[url]
+    if "@public-pg-" in url:
+        candidates.append(url.replace("@public-pg-", "@pg-", 1))
+    elif "@pg-" in url:
+        candidates.append(url.replace("@pg-", "@public-pg-", 1))
+    # preserve order and remove duplicates
+    return list(dict.fromkeys(candidates))
+
 def _pg_schema_and_seed(url):
     import psycopg2
     from psycopg2.extras import execute_values
@@ -232,12 +242,17 @@ def _init_local_fallback():
 
 
 PG_ACTIVE = False
+ACTIVE_DATABASE_URL = DATABASE_URL
 if DATABASE_URL:
-    try:
-        _pg_schema_and_seed(DATABASE_URL)
-        PG_ACTIVE = True
-    except Exception as e:
-        print(f"POSTGRES_UNAVAILABLE={type(e).__name__}: {e}", flush=True)
+    for _candidate_url in _database_url_candidates(DATABASE_URL):
+        try:
+            _pg_schema_and_seed(_candidate_url)
+            ACTIVE_DATABASE_URL = _candidate_url
+            PG_ACTIVE = True
+            print("POSTGRES_CONNECTED=1", flush=True)
+            break
+        except Exception as e:
+            print(f"POSTGRES_CANDIDATE_UNAVAILABLE={type(e).__name__}: {e}", flush=True)
 
 if PG_ACTIVE:
     import psycopg2
@@ -266,7 +281,7 @@ if PG_ACTIVE:
 
     class PGConnection:
         def __init__(self):
-            self.raw=psycopg2.connect(DATABASE_URL, sslmode="require")
+            self.raw=psycopg2.connect(ACTIVE_DATABASE_URL, sslmode="require")
             self.row_factory=None
         def execute(self,sql,params=()):
             q=_translate(sql)
