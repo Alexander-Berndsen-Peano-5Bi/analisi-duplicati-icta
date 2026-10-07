@@ -29,6 +29,11 @@
     </nav>
   </header>
   <main class="container">
+    {% if database_degraded %}
+      <div class="flash warning" style="margin-bottom:16px">
+        <strong>Modalità temporanea:</strong> database persistente non raggiungibile. Consultazione disponibile; import e modifiche sono momentaneamente disabilitati.
+      </div>
+    {% endif %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
